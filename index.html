@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>导航门户</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script>
+        // 配置Tailwind自定义主题
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#165DFF',
+                        secondary: '#36CFC9',
+                        dark: '#1D1D1F',
+                        'dark-light': '#2C2C2E',
+                        'dark-lighter': '#3A3A3C',
+                        'text-primary': '#F5F5F7',
+                        'text-secondary': '#AEAEB2'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .scrollbar-hide {
+                -ms-overflow-style: none;
+                scrollbar-width: none;
+            }
+            .scrollbar-hide::-webkit-scrollbar {
+                display: none;
+            }
+            .card-hover {
+                @apply transition-all duration-300 hover:shadow-lg hover:shadow-primary/20 hover:-translate-y-1;
+            }
+            .btn-effect {
+                @apply transition-all duration-200 active:scale-95;
+            }
+            .icon-container {
+                @apply w-12 h-12 rounded-md bg-dark flex items-center justify-center mb-2 overflow-hidden;
+            }
+            .default-icon {
+                @apply text-xl;
+            }
+        }
+    </style>
+</head>
+
+<body class="bg-dark text-text-primary min-h-screen flex flex-col">
+    <!-- 顶部导航栏 -->
+    <header class="bg-dark-light border-b border-gray-700/50 sticky top-0 z-50">
+        <div class="container mx-auto px-4">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center">
+                    <!-- 网站图标 -->
+                    <div
+                        class="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center mr-3">
+                        <span class="text-white font-bold text-xl">🌐</span>
+                    </div>
+                    <h1 class="text-xl font-bold text-primary mr-8">导航门户</h1>
+
+                    <!-- 分组标签滚动容器 -->
+                    <div class="relative overflow-x-auto scrollbar-hide flex-1 max-w-full">
+                        <div id="group-tabs" class="flex space-x-1 py-2 min-w-max">
+                            <!-- 分组标签将通过JS动态生成 -->
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex items-center space-x-4">
+                    <button id="add-group-btn"
+                        class="flex items-center px-3 py-1.5 rounded-md bg-dark-lighter hover:bg-primary/10 text-sm btn-effect">
+                        <i class="fa fa-plus mr-1.5"></i> 新增分组
+                    </button>
+                    <button id="settings-btn"
+                        class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-dark-lighter btn-effect">
+                        <i class="fa fa-cog"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主内容区 -->
+    <main class="flex-1 container mx-auto px-4 py-6">
+        <!-- 当前分组标题和操作 -->
+        <div class="flex justify-between items-center mb-6">
+            <div>
+                <h2 id="current-group-title" class="text-xl font-semibold"></h2>
+                <p id="current-group-desc" class="text-text-secondary text-sm mt-1"></p>
+            </div>
+            <div id="current-group-actions" class="flex space-x-2">
+                <button id="edit-group-btn"
+                    class="px-3 py-1.5 rounded-md bg-dark-lighter hover:bg-primary/10 text-sm flex items-center btn-effect">
+                    <i class="fa fa-pencil mr-1.5"></i> 编辑分组
+                </button>
+                <button id="delete-group-btn"
+                    class="px-3 py-1.5 rounded-md bg-dark-lighter hover:bg-red-500/20 text-sm text-red-400 flex items-center btn-effect">
+                    <i class="fa fa-trash mr-1.5"></i> 删除分组
+                </button>
+                <button id="add-item-btn"
+                    class="px-3 py-1.5 rounded-md bg-primary hover:bg-primary/90 text-sm flex items-center btn-effect">
+                    <i class="fa fa-plus mr-1.5"></i> 新增应用
+                </button>
+            </div>
+        </div>
+
+        <!-- 应用网格 -->
+        <div id="apps-grid"
+            class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4">
+        </div>
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="bg-dark-light border-t border-gray-700/50 py-4">
+        <div class="container mx-auto px-4 text-center text-text-secondary text-sm">
+            <p>导航门户</p>
+        </div>
+    </footer>
+
+    <!-- 新增/编辑分组模态框 -->
+    <div id="group-modal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center hidden">
+        <div class="bg-dark-light rounded-lg shadow-xl w-full max-w-md p-6 transform transition-all">
+            <div class="flex justify-between items-center mb-4">
+                <h3 id="group-modal-title" class="text-lg font-semibold">新增分组</h3>
+                <button id="close-group-modal" class="text-text-secondary hover:text-text-primary btn-effect">
+                    <i class="fa fa-times"></i>
+                </button>
+            </div>
+            <form id="group-form">
+                <input type="hidden" id="group-id">
+                <div class="mb-4">
+                    <label for="group-name" class="block text-sm font-medium mb-1.5">分组名称</label>
+                    <input type="text" id="group-name"
+                        class="w-full px-3 py-2 bg-dark border border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary text-text-primary"
+                        required>
+                </div>
+                <div class="mb-6">
+                    <label for="group-desc" class="block text-sm font-medium mb-1.5">分组描述 (可选)</label>
+                    <input type="text" id="group-desc"
+                        class="w-full px-3 py-2 bg-dark border border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary text-text-primary">
+                </div>
+                <div class="flex justify-end space-x-3">
+                    <button type="button" id="cancel-group-btn"
+                        class="px-4 py-2 border border-gray-700 rounded-md hover:bg-dark-lighter btn-effect">取消</button>
+                    <button type="submit"
+                        class="px-4 py-2 bg-primary rounded-md hover:bg-primary/90 btn-effect">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 新增/编辑应用模态框 -->
+    <div id="item-modal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center hidden">
+        <div class="bg-dark-light rounded-lg shadow-xl w-full max-w-md p-6 transform transition-all">
+            <div class="flex justify-between items-center mb-4">
+                <h3 id="item-modal-title" class="text-lg font-semibold">新增应用</h3>
+                <button id="close-item-modal" class="text-text-secondary hover:text-text-primary btn-effect">
+                    <i class="fa fa-times"></i>
+                </button>
+            </div>
+            <form id="item-form">
+                <input type="hidden" id="item-id">
+                <input type="hidden" id="item-group-id">
+                <div class="mb-4">
+                    <label for="item-name" class="block text-sm font-medium mb-1.5">应用名称</label>
+                    <input type="text" id="item-name"
+                        class="w-full px-3 py-2 bg-dark border border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary text-text-primary"
+                        required>
+                </div>
+                <div class="mb-4">
+                    <label for="item-url" class="block text-sm font-medium mb-1.5">应用网址</label>
+                    <input type="url" id="item-url"
+                        class="w-full px-3 py-2 bg-dark border border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary text-text-primary"
+                        placeholder="https://" required>
+                </div>
+                <div class="mb-4">
+                    <label for="item-icon" class="block text-sm font-medium mb-1.5">图标URL (可选)</label>
+                    <input type="url" id="item-icon"
+                        class="w-full px-3 py-2 bg-dark border border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary text-text-primary"
+                        placeholder="https://">
+                    <p class="text-xs text-text-secondary mt-1">不填写则使用网站默认图标</p>
+                </div>
+                <div class="flex justify-end space-x-3">
+                    <button type="button" id="cancel-item-btn"
+                        class="px-4 py-2 border border-gray-700 rounded-md hover:bg-dark-lighter btn-effect">取消</button>
+                    <button type="submit"
+                        class="px-4 py-2 bg-primary rounded-md hover:bg-primary/90 btn-effect">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 确认删除模态框 -->
+    <div id="confirm-modal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center hidden">
+        <div class="bg-dark-light rounded-lg shadow-xl w-full max-w-md p-6 transform transition-all">
+            <div class="text-center mb-5">
+                <div
+                    class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-500/20 text-red-400 mb-4">
+                    <i class="fa fa-exclamation-triangle text-2xl"></i>
+                </div>
+                <h3 id="confirm-title" class="text-lg font-semibold mb-2">确认删除</h3>
+                <p id="confirm-message" class="text-text-secondary">您确定要删除吗？此操作不可撤销。</p>
+            </div>
+            <div class="flex justify-center space-x-3">
+                <button id="cancel-confirm-btn"
+                    class="px-4 py-2 border border-gray-700 rounded-md hover:bg-dark-lighter btn-effect">取消</button>
+                <button id="confirm-delete-btn"
+                    class="px-4 py-2 bg-red-500 rounded-md hover:bg-red-600 btn-effect">删除</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 数据管理
+        const DataManager = {
+            // 初始化数据
+            init() {
+                const savedData = localStorage.getItem('portalData');
+                if (!savedData) {
+                    // 初始数据 - 包含最近访问分组
+                    const initialData = {
+                        groups: [
+                            {
+                                id: 'recent',
+                                name: '最近访问',
+                                desc: '按访问时间排序的应用',
+                                isDefault: true,
+                                items: []
+                            },
+                        ],
+                        currentGroupId: 'recent'
+                    };
+                    this.saveData(initialData);
+                    return initialData;
+                }
+                return JSON.parse(savedData);
+            },
+
+            // 保存数据到localStorage
+            saveData(data) {
+                localStorage.setItem('portalData', JSON.stringify(data));
+            },
+
+            // 获取所有数据
+            getAllData() {
+                return this.init();
+            },
+
+            // 获取所有分组
+            getGroups() {
+                return this.getAllData().groups;
+            },
+
+            // 获取当前分组ID
+            getCurrentGroupId() {
+                return this.getAllData().currentGroupId;
+            },
+
+            // 设置当前分组
+            setCurrentGroupId(groupId) {
+                const data = this.getAllData();
+                data.currentGroupId = groupId;
+                this.saveData(data);
+            },
+
+            // 获取当前分组
+            getCurrentGroup() {
+                const data = this.getAllData();
+                return data.groups.find(group => group.id === data.currentGroupId);
+            },
+
+            // 获取指定分组
+            getGroup(groupId) {
+                return this.getGroups().find(group => group.id === groupId);
+            },
+
+            // 添加新分组
+            addGroup(group) {
+                const data = this.getAllData();
+                const newGroup = {
+                    id: 'group_' + Date.now(),
+                    isDefault: false,
+                    ...group,
+                    items: []
+                };
+                data.groups.push(newGroup);
+                this.saveData(data);
+                return newGroup;
+            },
+
+            // 更新分组
+            updateGroup(groupId, updatedData) {
+                const data = this.getAllData();
+                const index = data.groups.findIndex(group => group.id === groupId);
+                if (index !== -1) {
+                    // 保留原有ID和isDefault属性
+                    data.groups[index] = {
+                        ...data.groups[index],
+                        ...updatedData
+                    };
+                    this.saveData(data);
+                    return data.groups[index];
+                }
+                return null;
+            },
+
+            // 删除分组
+            deleteGroup(groupId) {
+                const data = this.getAllData();
+                // 不能删除默认分组
+                const group = data.groups.find(g => g.id === groupId);
+                if (group && group.isDefault) return false;
+
+                const initialGroupId = data.groups[0].id;
+
+                // 如果删除的是当前分组，切换到第一个分组
+                if (data.currentGroupId === groupId) {
+                    data.currentGroupId = initialGroupId;
+                }
+
+                data.groups = data.groups.filter(group => group.id !== groupId);
+                this.saveData(data);
+                return true;
+            },
+
+            // 向分组添加应用
+            addItem(groupId, item) {
+                const data = this.getAllData();
+                const groupIndex = data.groups.findIndex(group => group.id === groupId);
+                if (groupIndex !== -1) {
+                    const newItem = {
+                        id: 'item_' + Date.now(),
+                        ...item,
+                        lastAccessed: new Date().toISOString()
+                    };
+
+                    // 如果不是最近访问分组，也添加到最近访问
+                    if (groupId !== 'recent') {
+                        const recentGroupIndex = data.groups.findIndex(g => g.id === 'recent');
+                        if (recentGroupIndex !== -1) {
+                            // 检查是否已存在，存在则移除旧的
+                            data.groups[recentGroupIndex].items = data.groups[recentGroupIndex].items
+                                .filter(i => i.id !== newItem.id);
+                            data.groups[recentGroupIndex].items.unshift(newItem);
+                            // 限制最近访问数量为20
+                            if (data.groups[recentGroupIndex].items.length > 20) {
+                                data.groups[recentGroupIndex].items.pop();
+                            }
+                        }
+                    }
+
+                    data.groups[groupIndex].items.push(newItem);
+                    this.saveData(data);
+                    return newItem;
+                }
+                return null;
+            },
+
+            // 更新应用
+            updateItem(groupId, itemId, updatedData) {
+                const data = this.getAllData();
+                const groupIndex = data.groups.findIndex(group => group.id === groupId);
+                if (groupIndex !== -1) {
+                    const itemIndex = data.groups[groupIndex].items.findIndex(item => item.id === itemId);
+                    if (itemIndex !== -1) {
+                        // 保留原有ID
+                        const updatedItem = {
+                            ...data.groups[groupIndex].items[itemIndex],
+                            ...updatedData
+                        };
+
+                        data.groups[groupIndex].items[itemIndex] = updatedItem;
+
+                        // 如果不是最近访问分组，同步更新最近访问中的项目
+                        if (groupId !== 'recent') {
+                            const recentGroupIndex = data.groups.findIndex(g => g.id === 'recent');
+                            if (recentGroupIndex !== -1) {
+                                const recentItemIndex = data.groups[recentGroupIndex].items.findIndex(i => i.id === itemId);
+                                if (recentItemIndex !== -1) {
+                                    data.groups[recentGroupIndex].items[recentItemIndex] = updatedItem;
+                                }
+                            }
+                        }
+
+                        this.saveData(data);
+                        return updatedItem;
+                    }
+                }
+                return null;
+            },
+
+            // 删除应用
+            deleteItem(groupId, itemId) {
+                const data = this.getAllData();
+                const groupIndex = data.groups.findIndex(group => group.id === groupId);
+                if (groupIndex !== -1) {
+                    data.groups[groupIndex].items = data.groups[groupIndex].items.filter(item => item.id !== itemId);
+
+                    // 同时从最近访问中删除
+                    const recentGroupIndex = data.groups.findIndex(g => g.id === 'recent');
+                    if (recentGroupIndex !== -1) {
+                        data.groups[recentGroupIndex].items = data.groups[recentGroupIndex].items.filter(i => i.id !== itemId);
+                    }
+
+                    this.saveData(data);
+                    return true;
+                }
+                return false;
+            },
+
+            // 记录应用访问时间
+            recordAccess(itemId) {
+                const data = this.getAllData();
+
+                // 查找项目所在的分组
+                let itemToUpdate = null;
+                let sourceGroupId = null;
+
+                for (const group of data.groups) {
+                    const item = group.items.find(i => i.id === itemId);
+                    if (item) {
+                        itemToUpdate = item;
+                        sourceGroupId = group.id;
+                        break;
+                    }
+                }
+
+                if (itemToUpdate && sourceGroupId !== 'recent') {
+                    // 更新访问时间
+                    itemToUpdate.lastAccessed = new Date().toISOString();
+
+                    // 更新源分组中的项目
+                    const sourceGroupIndex = data.groups.findIndex(g => g.id === sourceGroupId);
+                    if (sourceGroupIndex !== -1) {
+                        const itemIndex = data.groups[sourceGroupIndex].items.findIndex(i => i.id === itemId);
+                        if (itemIndex !== -1) {
+                            data.groups[sourceGroupIndex].items[itemIndex] = itemToUpdate;
+                        }
+                    }
+
+                    // 更新最近访问分组
+                    const recentGroupIndex = data.groups.findIndex(g => g.id === 'recent');
+                    if (recentGroupIndex !== -1) {
+                        // 先移除旧的
+                        data.groups[recentGroupIndex].items = data.groups[recentGroupIndex].items
+                            .filter(i => i.id !== itemId);
+                        // 添加到开头
+                        data.groups[recentGroupIndex].items.unshift(itemToUpdate);
+                        // 限制数量
+                        if (data.groups[recentGroupIndex].items.length > 20) {
+                            data.groups[recentGroupIndex].items.pop();
+                        }
+                    }
+
+                    this.saveData(data);
+                    return true;
+                }
+
+                return false;
+            },
+
+            // 清空最近访问记录
+            clearRecentItems() {
+                const data = this.getAllData();
+                const recentGroupIndex = data.groups.findIndex(g => g.id === 'recent');
+                if (recentGroupIndex !== -1) {
+                    data.groups[recentGroupIndex].items = [];
+                    this.saveData(data);
+                    return true;
+                }
+                return false;
+            }
+        };
+
+        // UI渲染管理
+        const UIManager = {
+            // 初始化UI
+            init() {
+                this.renderGroupTabs();
+                this.renderCurrentGroup();
+                this.setupEventListeners();
+            },
+
+            // 渲染分组标签
+            renderGroupTabs() {
+                const groups = DataManager.getGroups();
+                const currentGroupId = DataManager.getCurrentGroupId();
+                const groupTabsContainer = document.getElementById('group-tabs');
+
+                groupTabsContainer.innerHTML = '';
+
+                groups.forEach(group => {
+                    const tab = document.createElement('button');
+                    tab.className = `px-3 py-1.5 rounded-md text-sm whitespace-nowrap btn-effect ${group.id === currentGroupId
+                        ? 'bg-primary text-white'
+                        : 'bg-dark-lighter hover:bg-primary/10'
+                        }`;
+                    tab.textContent = group.name;
+                    tab.dataset.groupId = group.id;
+
+                    tab.addEventListener('click', () => {
+                        DataManager.setCurrentGroupId(group.id);
+                        this.renderGroupTabs();
+                        this.renderCurrentGroup();
+                    });
+
+                    groupTabsContainer.appendChild(tab);
+                });
+            },
+
+            // 渲染当前分组内容
+            renderCurrentGroup() {
+                const currentGroup = DataManager.getCurrentGroup();
+                if (!currentGroup) return;
+
+                // 更新标题和描述
+                document.getElementById('current-group-title').textContent = currentGroup.name;
+                document.getElementById('current-group-desc').textContent = currentGroup.desc || '无描述';
+
+                // 获取按钮容器并清空
+                const actionsContainer = document.getElementById('current-group-actions');
+                // 保存新增应用按钮，后面会重新添加
+                const addItemBtn = document.getElementById('add-item-btn');
+                // 清空容器
+                actionsContainer.innerHTML = '';
+
+                // 添加编辑和删除按钮
+                const editBtn = document.createElement('button');
+                editBtn.id = 'edit-group-btn';
+                editBtn.className = `px-3 py-1.5 rounded-md bg-dark-lighter hover:bg-primary/10 text-sm flex items-center btn-effect ${currentGroup.isDefault ? 'opacity-50' : ''}`;
+                editBtn.disabled = currentGroup.isDefault;
+                editBtn.innerHTML = '<i class="fa fa-pencil mr-1.5"></i> 编辑分组';
+                editBtn.addEventListener('click', () => this.openEditGroupModal());
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.id = 'delete-group-btn';
+                deleteBtn.className = `px-3 py-1.5 rounded-md bg-dark-lighter hover:bg-red-500/20 text-sm text-red-400 flex items-center btn-effect ${currentGroup.isDefault ? 'opacity-50' : ''}`;
+                deleteBtn.disabled = currentGroup.isDefault;
+                deleteBtn.innerHTML = '<i class="fa fa-trash mr-1.5"></i> 删除分组';
+                deleteBtn.addEventListener('click', () => this.openDeleteGroupConfirm());
+
+                // 如果是最近访问分组，添加清空按钮
+                if (currentGroup.id === 'recent') {
+                    const clearBtn = document.createElement('button');
+                    clearBtn.id = 'clear-recent-btn';
+                    clearBtn.className = 'px-3 py-1.5 rounded-md bg-dark-lighter hover:bg-red-500/20 text-sm text-red-400 flex items-center btn-effect';
+                    clearBtn.innerHTML = '<i class="fa fa-trash mr-1.5"></i> 清空历史';
+                    clearBtn.addEventListener('click', () => this.openClearRecentConfirm());
+                    actionsContainer.appendChild(clearBtn);
+                }
+
+                // 添加编辑、删除和新增按钮
+                actionsContainer.appendChild(editBtn);
+                actionsContainer.appendChild(deleteBtn);
+                actionsContainer.appendChild(addItemBtn);
+
+                // 渲染应用列表
+                this.renderApps(currentGroup.items);
+            },
+
+            // 渲染应用列表
+            renderApps(items) {
+                const appsGrid = document.getElementById('apps-grid');
+                const currentGroup = DataManager.getCurrentGroup();
+
+                if (items.length == 0) {
+                    if (currentGroup.id === 'recent') {
+                        // 重置应用列表
+                        appsGrid.innerHTML = `<!-- 应用卡片将通过JS动态生成 -->
+                            <div class="col-span-full flex items-center justify-center py-16 text-text-secondary">
+                                <div class="text-center">
+                                    <i class="fa fa-clock-o text-4xl mb-3 opacity-30"></i>
+                                    <p>暂无最近访问记录</p>
+                                </div>
+                            </div>`
+                    } else {
+                        // 重置应用列表
+                        appsGrid.innerHTML = `<!-- 应用卡片将通过JS动态生成 -->
+                            <div class="col-span-full flex items-center justify-center py-16 text-text-secondary">
+                                <div class="text-center">
+                                    <i class="fa fa-grid-o text-4xl mb-3 opacity-30"></i>
+                                    <p>请添加应用到当前分组</p>
+                                </div>
+                            </div>`
+                    }
+                } else {
+                    // 重置应用列表
+                    appsGrid.innerHTML = ""
+                }
+
+
+                // 对最近访问分组按访问时间排序
+                let sortedItems = [...items];
+                if (currentGroup.id === 'recent') {
+                    sortedItems.sort((a, b) => new Date(b.lastAccessed) - new Date(a.lastAccessed));
+                }
+
+                sortedItems.forEach((item, index) => {
+                    const appCard = document.createElement('div');
+                    appCard.className = 'bg-dark-light rounded-lg p-3 card-hover group relative overflow-hidden';
+
+                    // 创建图标容器
+                    const iconContainer = document.createElement('div');
+                    iconContainer.id = `app-icon-${index}`
+                    iconContainer.className = 'icon-container';
+
+                    // 生成默认图标URL（使用网站域名的favicon）
+                    let iconUrl = item.icon;
+                    if (!iconUrl) {
+                        try {
+                            const url = new URL(item.url);
+                            iconUrl = `https://${url.hostname}/favicon.ico`;
+                        } catch (e) {
+                            iconUrl = ''; // 将使用默认图标
+                        }
+                    }
+
+                    // 创建图片元素并检测加载状态
+                    if (iconUrl) {
+                        const img = document.createElement('img');
+                        img.src = iconUrl;
+                        img.alt = `${item.name}图标`;
+                        img.className = 'w-full h-full object-contain';
+
+                        // 图片加载失败时显示默认图标
+                        img.addEventListener('error', (e) => {
+                            let iconContainer = document.getElementById("app-icon-" + index)
+                            iconContainer.innerHTML = '<span class="default-icon">🌐</span>';
+                        });
+
+                        iconContainer.appendChild(img);
+                    } else {
+                        // 没有图标URL时直接显示默认图标
+                        iconContainer.innerHTML = '<span class="default-icon">🌐</span>';
+                    }
+
+                    // 构建应用卡片内容
+                    appCard.innerHTML = `
+                        <div class="flex flex-col items-center">
+                            ${iconContainer.outerHTML}
+                            <h3 class="text-sm font-medium text-center truncate w-full">${item.name}</h3>
+                        </div>
+                        <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                            <button class="edit-item-btn w-8 h-8 rounded-full bg-dark-lighter flex items-center justify-center hover:bg-primary/20" data-id="${item.id}">
+                                <i class="fa fa-pencil text-sm"></i>
+                            </button>
+                            <button class="delete-item-btn w-8 h-8 rounded-full bg-dark-lighter flex items-center justify-center hover:bg-red-500/20 text-red-400" data-id="${item.id}">
+                                <i class="fa fa-trash text-sm"></i>
+                            </button>
+                        </div>
+                    `;
+
+                    // 点击卡片打开链接并记录访问
+                    appCard.addEventListener('click', (e) => {
+                        // 如果点击的是编辑或删除按钮，则不打开链接
+                        if (!e.target.closest('.edit-item-btn') && !e.target.closest('.delete-item-btn')) {
+                            window.open(item.url, '_blank');
+                            DataManager.recordAccess(item.id);
+
+                            // 如果当前是最近访问分组，重新渲染
+                            if (DataManager.getCurrentGroup().id === 'recent') {
+                                this.renderCurrentGroup();
+                            }
+                        }
+                    });
+
+                    // 编辑应用
+                    appCard.querySelector('.edit-item-btn').addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        this.openEditItemModal(item.id);
+                    });
+
+                    // 删除应用
+                    appCard.querySelector('.delete-item-btn').addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        this.openDeleteItemConfirm(item.id);
+                    });
+
+                    appsGrid.appendChild(appCard);
+                });
+            },
+
+            // 打开新增分组模态框
+            openAddGroupModal() {
+                document.getElementById('group-modal-title').textContent = '新增分组';
+                document.getElementById('group-form').reset();
+                document.getElementById('group-id').value = '';
+                document.getElementById('group-modal').classList.remove('hidden');
+                document.getElementById('group-name').focus();
+            },
+
+            // 打开编辑分组模态框
+            openEditGroupModal() {
+                const currentGroup = DataManager.getCurrentGroup();
+                if (!currentGroup || currentGroup.isDefault) return;
+
+                document.getElementById('group-modal-title').textContent = '编辑分组';
+                document.getElementById('group-id').value = currentGroup.id;
+                document.getElementById('group-name').value = currentGroup.name;
+                document.getElementById('group-desc').value = currentGroup.desc || '';
+                document.getElementById('group-modal').classList.remove('hidden');
+                document.getElementById('group-name').focus();
+            },
+
+            // 打开删除分组确认
+            openDeleteGroupConfirm() {
+                const currentGroup = DataManager.getCurrentGroup();
+                if (!currentGroup || currentGroup.isDefault) return;
+
+                document.getElementById('confirm-title').textContent = '删除分组';
+                document.getElementById('confirm-message').textContent = `您确定要删除"${currentGroup.name}"分组吗？分组内的所有应用也将被删除。`;
+                document.getElementById('confirm-modal').classList.remove('hidden');
+
+                // 设置确认按钮回调
+                const confirmBtn = document.getElementById('confirm-delete-btn');
+                // 移除之前的事件监听
+                confirmBtn.replaceWith(confirmBtn.cloneNode(true));
+                // 添加新的事件监听
+                document.getElementById('confirm-delete-btn').addEventListener('click', () => {
+                    DataManager.deleteGroup(currentGroup.id);
+                    this.closeConfirmModal();
+                    this.renderGroupTabs();
+                    this.renderCurrentGroup();
+                });
+            },
+
+            // 打开清空最近访问确认
+            openClearRecentConfirm() {
+                document.getElementById('confirm-title').textContent = '清空最近访问';
+                document.getElementById('confirm-message').textContent = '您确定要清空所有最近访问记录吗？此操作不可撤销。';
+                document.getElementById('confirm-modal').classList.remove('hidden');
+
+                // 设置确认按钮回调
+                const confirmBtn = document.getElementById('confirm-delete-btn');
+                // 移除之前的事件监听
+                confirmBtn.replaceWith(confirmBtn.cloneNode(true));
+                // 添加新的事件监听
+                document.getElementById('confirm-delete-btn').addEventListener('click', () => {
+                    DataManager.clearRecentItems();
+                    this.closeConfirmModal();
+                    this.renderCurrentGroup();
+                });
+            },
+
+            // 打开新增应用模态框
+            openAddItemModal() {
+                const currentGroupId = DataManager.getCurrentGroupId();
+                document.getElementById('item-modal-title').textContent = '新增应用';
+                document.getElementById('item-form').reset();
+                document.getElementById('item-id').value = '';
+                document.getElementById('item-group-id').value = currentGroupId;
+                document.getElementById('item-modal').classList.remove('hidden');
+                document.getElementById('item-name').focus();
+            },
+
+            // 打开编辑应用模态框
+            openEditItemModal(itemId) {
+                const currentGroupId = DataManager.getCurrentGroupId();
+                const currentGroup = DataManager.getGroup(currentGroupId);
+                const item = currentGroup.items.find(i => i.id === itemId);
+
+                if (item) {
+                    document.getElementById('item-modal-title').textContent = '编辑应用';
+                    document.getElementById('item-id').value = item.id;
+                    document.getElementById('item-group-id').value = currentGroupId;
+                    document.getElementById('item-name').value = item.name;
+                    document.getElementById('item-url').value = item.url;
+                    document.getElementById('item-icon').value = item.icon || '';
+                    document.getElementById('item-modal').classList.remove('hidden');
+                    document.getElementById('item-name').focus();
+                }
+            },
+
+            // 打开删除应用确认
+            openDeleteItemConfirm(itemId) {
+                const currentGroupId = DataManager.getCurrentGroupId();
+                const currentGroup = DataManager.getGroup(currentGroupId);
+                const item = currentGroup.items.find(i => i.id === itemId);
+
+                if (item) {
+                    document.getElementById('confirm-title').textContent = '删除应用';
+                    document.getElementById('confirm-message').textContent = `您确定要删除"${item.name}"吗？`;
+                    document.getElementById('confirm-modal').classList.remove('hidden');
+
+                    // 设置确认按钮回调
+                    const confirmBtn = document.getElementById('confirm-delete-btn');
+                    // 移除之前的事件监听
+                    confirmBtn.replaceWith(confirmBtn.cloneNode(true));
+                    // 添加新的事件监听
+                    document.getElementById('confirm-delete-btn').addEventListener('click', () => {
+                        DataManager.deleteItem(currentGroupId, itemId);
+                        this.closeConfirmModal();
+                        this.renderCurrentGroup();
+                    });
+                }
+            },
+
+            // 关闭分组模态框
+            closeGroupModal() {
+                document.getElementById('group-modal').classList.add('hidden');
+            },
+
+            // 关闭应用模态框
+            closeItemModal() {
+                document.getElementById('item-modal').classList.add('hidden');
+            },
+
+            // 关闭确认模态框
+            closeConfirmModal() {
+                document.getElementById('confirm-modal').classList.add('hidden');
+            },
+
+            // 设置事件监听器
+            setupEventListeners() {
+                // 新增分组按钮
+                document.getElementById('add-group-btn').addEventListener('click', () => {
+                    this.openAddGroupModal();
+                });
+
+                // 新增应用按钮
+                document.getElementById('add-item-btn').addEventListener('click', () => {
+                    this.openAddItemModal();
+                });
+
+                // 关闭分组模态框
+                document.getElementById('close-group-modal').addEventListener('click', () => {
+                    this.closeGroupModal();
+                });
+                document.getElementById('cancel-group-btn').addEventListener('click', () => {
+                    this.closeGroupModal();
+                });
+
+                // 关闭应用模态框
+                document.getElementById('close-item-modal').addEventListener('click', () => {
+                    this.closeItemModal();
+                });
+                document.getElementById('cancel-item-btn').addEventListener('click', () => {
+                    this.closeItemModal();
+                });
+
+                // 关闭确认模态框
+                document.getElementById('cancel-confirm-btn').addEventListener('click', () => {
+                    this.closeConfirmModal();
+                });
+
+                // 提交分组表单
+                document.getElementById('group-form').addEventListener('submit', (e) => {
+                    e.preventDefault();
+
+                    const groupId = document.getElementById('group-id').value;
+                    const groupData = {
+                        name: document.getElementById('group-name').value,
+                        desc: document.getElementById('group-desc').value
+                    };
+
+                    if (groupId) {
+                        // 更新分组
+                        DataManager.updateGroup(groupId, groupData);
+                    } else {
+                        // 新增分组
+                        const newGroup = DataManager.addGroup(groupData);
+                        DataManager.setCurrentGroupId(newGroup.id);
+                    }
+
+                    this.closeGroupModal();
+                    this.renderGroupTabs();
+                    this.renderCurrentGroup();
+                });
+
+                // 提交应用表单
+                document.getElementById('item-form').addEventListener('submit', (e) => {
+                    e.preventDefault();
+
+                    const itemId = document.getElementById('item-id').value;
+                    const groupId = document.getElementById('item-group-id').value;
+                    const itemData = {
+                        name: document.getElementById('item-name').value,
+                        url: document.getElementById('item-url').value,
+                        icon: document.getElementById('item-icon').value || ''
+                    };
+
+                    if (itemId) {
+                        // 更新应用
+                        DataManager.updateItem(groupId, itemId, itemData);
+                    } else {
+                        // 新增应用
+                        DataManager.addItem(groupId, itemData);
+                    }
+
+                    this.closeItemModal();
+                    this.renderCurrentGroup();
+                });
+            }
+        };
+
+        // 初始化应用
+        document.addEventListener('DOMContentLoaded', () => {
+            // 初始化数据
+            DataManager.init();
+            // 初始化UI
+            UIManager.init();
+        });
+    </script>
+</body>
+
+</html>
