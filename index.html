@@ -51,7 +51,10 @@
                 @apply w-12 h-12 rounded-md bg-dark flex items-center justify-center mb-2 overflow-hidden;
             }
             .default-icon {
-                @apply text-xl;
+                @apply text-xl text-primary;
+            }
+            .dropdown-item {
+                @apply px-4 py-2 hover:bg-dark-lighter cursor-pointer transition-colors;
             }
         }
     </style>
@@ -83,10 +86,30 @@
                         class="flex items-center px-3 py-1.5 rounded-md bg-dark-lighter hover:bg-primary/10 text-sm btn-effect">
                         <i class="fa fa-plus mr-1.5"></i> 新增分组
                     </button>
-                    <button id="settings-btn"
-                        class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-dark-lighter btn-effect">
-                        <i class="fa fa-cog"></i>
-                    </button>
+
+                    <!-- 设置按钮和下拉菜单 -->
+                    <div class="relative" id="settings-dropdown">
+                        <button id="settings-btn"
+                            class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-dark-lighter btn-effect">
+                            <i class="fa fa-cog"></i>
+                        </button>
+
+                        <!-- 下拉菜单 -->
+                        <div id="settings-menu"
+                            class="absolute right-0 mt-2 w-48 bg-dark-light rounded-md shadow-lg py-1 hidden z-50">
+                            <div class="dropdown-item" id="export-data-btn">
+                                <i class="fa fa-download mr-2"></i>导出数据
+                            </div>
+                            <div class="dropdown-item" id="import-data-btn">
+                                <i class="fa fa-upload mr-2"></i>导入数据
+                            </div>
+                            <input type="file" id="import-file-input" accept=".json" class="hidden">
+                            <div class="border-t border-gray-700 my-1"></div>
+                            <div class="dropdown-item text-red-400" id="clear-all-data-btn">
+                                <i class="fa fa-trash mr-2"></i>清空所有数据
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -202,7 +225,7 @@
         </div>
     </div>
 
-    <!-- 确认删除模态框 -->
+    <!-- 确认操作模态框 -->
     <div id="confirm-modal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center hidden">
         <div class="bg-dark-light rounded-lg shadow-xl w-full max-w-md p-6 transform transition-all">
             <div class="text-center mb-5">
@@ -216,10 +239,17 @@
             <div class="flex justify-center space-x-3">
                 <button id="cancel-confirm-btn"
                     class="px-4 py-2 border border-gray-700 rounded-md hover:bg-dark-lighter btn-effect">取消</button>
-                <button id="confirm-delete-btn"
-                    class="px-4 py-2 bg-red-500 rounded-md hover:bg-red-600 btn-effect">删除</button>
+                <button id="confirm-action-btn"
+                    class="px-4 py-2 bg-red-500 rounded-md hover:bg-red-600 btn-effect">确认</button>
             </div>
         </div>
+    </div>
+
+    <!-- 通知提示框 -->
+    <div id="toast-notification"
+        class="fixed bottom-4 right-4 bg-dark-light rounded-lg shadow-lg p-4 transform translate-y-20 opacity-0 transition-all duration-300 flex items-center z-50 hidden">
+        <i id="toast-icon" class="fa fa-check-circle text-green-500 mr-2"></i>
+        <span id="toast-message">操作成功</span>
     </div>
 
     <script>
@@ -481,6 +511,64 @@
                     return true;
                 }
                 return false;
+            },
+
+            // 导入数据
+            importData(importedData) {
+                try {
+                    // 验证导入的数据结构是否正确
+                    if (!importedData || !importedData.groups || !importedData.currentGroupId) {
+                        throw new Error('导入的数据格式不正确');
+                    }
+
+                    // 确保最近访问分组存在
+                    let hasRecentGroup = importedData.groups.some(g => g.id === 'recent');
+                    if (!hasRecentGroup) {
+                        importedData.groups.unshift({
+                            id: 'recent',
+                            name: '最近访问',
+                            desc: '按访问时间排序的应用',
+                            isDefault: true,
+                            items: []
+                        });
+
+                        // 如果当前分组ID不存在，设置为最近访问
+                        const currentGroupExists = importedData.groups.some(g => g.id === importedData.currentGroupId);
+                        if (!currentGroupExists) {
+                            importedData.currentGroupId = 'recent';
+                        }
+                    }
+
+                    // 保存导入的数据
+                    this.saveData(importedData);
+                    return true;
+                } catch (error) {
+                    console.error('导入数据失败:', error);
+                    return false;
+                }
+            },
+
+            // 导出数据
+            exportData() {
+                return this.getAllData();
+            },
+
+            // 清空所有数据
+            clearAllData() {
+                const initialData = {
+                    groups: [
+                        {
+                            id: 'recent',
+                            name: '最近访问',
+                            desc: '按访问时间排序的应用',
+                            isDefault: true,
+                            items: []
+                        },
+                    ],
+                    currentGroupId: 'recent'
+                };
+                this.saveData(initialData);
+                return true;
             }
         };
 
@@ -570,6 +658,47 @@
                 this.renderApps(currentGroup.items);
             },
 
+            // 创建应用图标
+            createAppIcon(item, index) {
+                const iconContainer = document.createElement('div');
+                iconContainer.className = 'icon-container';
+                iconContainer.id = `app-icon-${index}`;
+
+                // 生成默认图标URL（使用网站域名的favicon）
+                let iconUrl = item.icon;
+                if (!iconUrl) {
+                    try {
+                        const url = new URL(item.url);
+                        iconUrl = `https://${url.hostname}/favicon.ico`;
+                    } catch (e) {
+                        iconUrl = ''; // 将使用默认图标
+                    }
+                }
+
+                if (iconUrl) {
+                    // 创建图片元素
+                    const img = document.createElement('img');
+                    img.src = iconUrl;
+                    img.alt = `${item.name}图标`;
+                    img.className = 'w-full h-full object-contain';
+
+                    // 图片加载失败时显示默认图标
+                    img.addEventListener('error', function (e) {
+                        console.log(e);
+                        let iconContainer = document.getElementById("app-icon-" + index);
+                        iconContainer.innerHTML = '<span class="default-icon">🌐</span>';
+                    });
+
+                    // 先添加图片到容器
+                    iconContainer.appendChild(img);
+                } else {
+                    // 没有图标URL时直接显示默认图标
+                    iconContainer.innerHTML = '<span class="default-icon">🌐</span>';
+                }
+
+                return iconContainer;
+            },
+
             // 渲染应用列表
             renderApps(items) {
                 const appsGrid = document.getElementById('apps-grid');
@@ -612,39 +741,7 @@
                     appCard.className = 'bg-dark-light rounded-lg p-3 card-hover group relative overflow-hidden';
 
                     // 创建图标容器
-                    const iconContainer = document.createElement('div');
-                    iconContainer.id = `app-icon-${index}`
-                    iconContainer.className = 'icon-container';
-
-                    // 生成默认图标URL（使用网站域名的favicon）
-                    let iconUrl = item.icon;
-                    if (!iconUrl) {
-                        try {
-                            const url = new URL(item.url);
-                            iconUrl = `https://${url.hostname}/favicon.ico`;
-                        } catch (e) {
-                            iconUrl = ''; // 将使用默认图标
-                        }
-                    }
-
-                    // 创建图片元素并检测加载状态
-                    if (iconUrl) {
-                        const img = document.createElement('img');
-                        img.src = iconUrl;
-                        img.alt = `${item.name}图标`;
-                        img.className = 'w-full h-full object-contain';
-
-                        // 图片加载失败时显示默认图标
-                        img.addEventListener('error', (e) => {
-                            let iconContainer = document.getElementById("app-icon-" + index)
-                            iconContainer.innerHTML = '<span class="default-icon">🌐</span>';
-                        });
-
-                        iconContainer.appendChild(img);
-                    } else {
-                        // 没有图标URL时直接显示默认图标
-                        iconContainer.innerHTML = '<span class="default-icon">🌐</span>';
-                    }
+                    const iconContainer = this.createAppIcon(item, index);
 
                     // 构建应用卡片内容
                     appCard.innerHTML = `
@@ -692,6 +789,112 @@
                 });
             },
 
+            // 导出数据
+            exportData() {
+                try {
+                    const data = DataManager.exportData();
+                    const jsonString = JSON.stringify(data, null, 2);
+                    const blob = new Blob([jsonString], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+
+                    // 创建下载链接
+                    const a = document.createElement('a');
+                    a.href = url;
+                    const date = new Date();
+                    const formattedDate = `${date.getFullYear()}${(date.getMonth() + 1).toString().padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}`;
+                    a.download = `storage_${formattedDate}.json`;
+                    document.body.appendChild(a);
+                    a.click();
+
+                    // 清理
+                    setTimeout(() => {
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(url);
+                    }, 0);
+
+                    this.showToast('数据导出成功', 'success');
+                } catch (error) {
+                    console.error('导出数据失败:', error);
+                    this.showToast('数据导出失败', 'error');
+                }
+            },
+
+            // 导入数据
+            importData(file) {
+                const reader = new FileReader();
+
+                reader.onload = (e) => {
+                    try {
+                        const importedData = JSON.parse(e.target.result);
+                        const success = DataManager.importData(importedData);
+
+                        if (success) {
+                            this.renderGroupTabs();
+                            this.renderCurrentGroup();
+                            this.showToast('数据导入成功', 'success');
+                        } else {
+                            this.showToast('导入数据格式不正确', 'error');
+                        }
+                    } catch (error) {
+                        console.error('解析导入数据失败:', error);
+                        this.showToast('解析数据失败，请检查文件格式', 'error');
+                    }
+                };
+
+                reader.onerror = () => {
+                    console.error('读取文件失败');
+                    this.showToast('读取文件失败', 'error');
+                };
+
+                reader.readAsText(file);
+            },
+
+            // 清空所有数据
+            clearAllData() {
+                try {
+                    DataManager.clearAllData();
+                    this.renderGroupTabs();
+                    this.renderCurrentGroup();
+                    this.showToast('所有数据已清空', 'success');
+                } catch (error) {
+                    console.error('清空数据失败:', error);
+                    this.showToast('清空数据失败', 'error');
+                }
+            },
+
+            // 显示通知提示
+            showToast(message, type = 'success') {
+                const toast = document.getElementById('toast-notification');
+                const toastIcon = document.getElementById('toast-icon');
+                const toastMessage = document.getElementById('toast-message');
+
+                // 设置消息和图标
+                toastMessage.textContent = message;
+
+                if (type === 'success') {
+                    toastIcon.className = 'fa fa-check-circle text-green-500 mr-2';
+                } else if (type === 'error') {
+                    toastIcon.className = 'fa fa-exclamation-circle text-red-500 mr-2';
+                } else if (type === 'info') {
+                    toastIcon.className = 'fa fa-info-circle text-blue-500 mr-2';
+                }
+
+                // 显示通知
+                toast.classList.remove('hidden', 'translate-y-20', 'opacity-0');
+                toast.classList.add('translate-y-0', 'opacity-100');
+
+                // 3秒后隐藏
+                setTimeout(() => {
+                    toast.classList.remove('translate-y-0', 'opacity-100');
+                    toast.classList.add('translate-y-20', 'opacity-0');
+
+                    // 完全隐藏
+                    setTimeout(() => {
+                        toast.classList.add('hidden');
+                    }, 300);
+                }, 3000);
+            },
+
             // 打开新增分组模态框
             openAddGroupModal() {
                 document.getElementById('group-modal-title').textContent = '新增分组';
@@ -722,13 +925,14 @@
                 document.getElementById('confirm-title').textContent = '删除分组';
                 document.getElementById('confirm-message').textContent = `您确定要删除"${currentGroup.name}"分组吗？分组内的所有应用也将被删除。`;
                 document.getElementById('confirm-modal').classList.remove('hidden');
+                document.getElementById('confirm-action-btn').className = 'px-4 py-2 bg-red-500 rounded-md hover:bg-red-600 btn-effect';
 
                 // 设置确认按钮回调
-                const confirmBtn = document.getElementById('confirm-delete-btn');
+                const confirmBtn = document.getElementById('confirm-action-btn');
                 // 移除之前的事件监听
                 confirmBtn.replaceWith(confirmBtn.cloneNode(true));
                 // 添加新的事件监听
-                document.getElementById('confirm-delete-btn').addEventListener('click', () => {
+                document.getElementById('confirm-action-btn').addEventListener('click', () => {
                     DataManager.deleteGroup(currentGroup.id);
                     this.closeConfirmModal();
                     this.renderGroupTabs();
@@ -741,16 +945,55 @@
                 document.getElementById('confirm-title').textContent = '清空最近访问';
                 document.getElementById('confirm-message').textContent = '您确定要清空所有最近访问记录吗？此操作不可撤销。';
                 document.getElementById('confirm-modal').classList.remove('hidden');
+                document.getElementById('confirm-action-btn').className = 'px-4 py-2 bg-red-500 rounded-md hover:bg-red-600 btn-effect';
 
                 // 设置确认按钮回调
-                const confirmBtn = document.getElementById('confirm-delete-btn');
+                const confirmBtn = document.getElementById('confirm-action-btn');
                 // 移除之前的事件监听
                 confirmBtn.replaceWith(confirmBtn.cloneNode(true));
                 // 添加新的事件监听
-                document.getElementById('confirm-delete-btn').addEventListener('click', () => {
+                document.getElementById('confirm-action-btn').addEventListener('click', () => {
                     DataManager.clearRecentItems();
                     this.closeConfirmModal();
                     this.renderCurrentGroup();
+                    this.showToast('最近访问记录已清空', 'success');
+                });
+            },
+
+            // 打开导入数据确认
+            openImportDataConfirm() {
+                document.getElementById('confirm-title').textContent = '导入数据';
+                document.getElementById('confirm-message').textContent = '导入数据将覆盖现有所有数据，是否继续？';
+                document.getElementById('confirm-modal').classList.remove('hidden');
+                document.getElementById('confirm-action-btn').className = 'px-4 py-2 bg-primary rounded-md hover:bg-primary/90 btn-effect';
+
+                // 设置确认按钮回调
+                const confirmBtn = document.getElementById('confirm-action-btn');
+                // 移除之前的事件监听
+                confirmBtn.replaceWith(confirmBtn.cloneNode(true));
+                // 添加新的事件监听
+                document.getElementById('confirm-action-btn').addEventListener('click', () => {
+                    this.closeConfirmModal();
+                    // 触发文件选择
+                    document.getElementById('import-file-input').click();
+                });
+            },
+
+            // 打开清空所有数据确认
+            openClearAllDataConfirm() {
+                document.getElementById('confirm-title').textContent = '清空所有数据';
+                document.getElementById('confirm-message').textContent = '您确定要清空所有数据吗？此操作不可撤销，所有分组和应用都将被删除。';
+                document.getElementById('confirm-modal').classList.remove('hidden');
+                document.getElementById('confirm-action-btn').className = 'px-4 py-2 bg-red-500 rounded-md hover:bg-red-600 btn-effect';
+
+                // 设置确认按钮回调
+                const confirmBtn = document.getElementById('confirm-action-btn');
+                // 移除之前的事件监听
+                confirmBtn.replaceWith(confirmBtn.cloneNode(true));
+                // 添加新的事件监听
+                document.getElementById('confirm-action-btn').addEventListener('click', () => {
+                    this.closeConfirmModal();
+                    this.clearAllData();
                 });
             },
 
@@ -793,13 +1036,14 @@
                     document.getElementById('confirm-title').textContent = '删除应用';
                     document.getElementById('confirm-message').textContent = `您确定要删除"${item.name}"吗？`;
                     document.getElementById('confirm-modal').classList.remove('hidden');
+                    document.getElementById('confirm-action-btn').className = 'px-4 py-2 bg-red-500 rounded-md hover:bg-red-600 btn-effect';
 
                     // 设置确认按钮回调
-                    const confirmBtn = document.getElementById('confirm-delete-btn');
+                    const confirmBtn = document.getElementById('confirm-action-btn');
                     // 移除之前的事件监听
                     confirmBtn.replaceWith(confirmBtn.cloneNode(true));
                     // 添加新的事件监听
-                    document.getElementById('confirm-delete-btn').addEventListener('click', () => {
+                    document.getElementById('confirm-action-btn').addEventListener('click', () => {
                         DataManager.deleteItem(currentGroupId, itemId);
                         this.closeConfirmModal();
                         this.renderCurrentGroup();
@@ -822,8 +1066,22 @@
                 document.getElementById('confirm-modal').classList.add('hidden');
             },
 
+            // 切换设置下拉菜单
+            toggleSettingsMenu() {
+                const menu = document.getElementById('settings-menu');
+                menu.classList.toggle('hidden');
+            },
+
             // 设置事件监听器
             setupEventListeners() {
+                // 点击页面其他地方关闭下拉菜单
+                document.addEventListener('click', (e) => {
+                    const dropdown = document.getElementById('settings-dropdown');
+                    if (!dropdown.contains(e.target)) {
+                        document.getElementById('settings-menu').classList.add('hidden');
+                    }
+                });
+
                 // 新增分组按钮
                 document.getElementById('add-group-btn').addEventListener('click', () => {
                     this.openAddGroupModal();
@@ -832,6 +1090,40 @@
                 // 新增应用按钮
                 document.getElementById('add-item-btn').addEventListener('click', () => {
                     this.openAddItemModal();
+                });
+
+                // 设置按钮
+                document.getElementById('settings-btn').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.toggleSettingsMenu();
+                });
+
+                // 导出数据按钮
+                document.getElementById('export-data-btn').addEventListener('click', () => {
+                    this.exportData();
+                    this.toggleSettingsMenu();
+                });
+
+                // 导入数据按钮
+                document.getElementById('import-data-btn').addEventListener('click', () => {
+                    this.openImportDataConfirm();
+                    this.toggleSettingsMenu();
+                });
+
+                // 清空所有数据按钮
+                document.getElementById('clear-all-data-btn').addEventListener('click', () => {
+                    this.openClearAllDataConfirm();
+                    this.toggleSettingsMenu();
+                });
+
+                // 导入文件选择
+                document.getElementById('import-file-input').addEventListener('change', (e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                        this.importData(file);
+                        // 重置文件输入，允许重复选择同一文件
+                        e.target.value = '';
+                    }
                 });
 
                 // 关闭分组模态框
@@ -868,10 +1160,12 @@
                     if (groupId) {
                         // 更新分组
                         DataManager.updateGroup(groupId, groupData);
+                        this.showToast('分组更新成功', 'success');
                     } else {
                         // 新增分组
                         const newGroup = DataManager.addGroup(groupData);
                         DataManager.setCurrentGroupId(newGroup.id);
+                        this.showToast('分组创建成功', 'success');
                     }
 
                     this.closeGroupModal();
@@ -894,9 +1188,11 @@
                     if (itemId) {
                         // 更新应用
                         DataManager.updateItem(groupId, itemId, itemData);
+                        this.showToast('应用更新成功', 'success');
                     } else {
                         // 新增应用
                         DataManager.addItem(groupId, itemData);
+                        this.showToast('应用添加成功', 'success');
                     }
 
                     this.closeItemModal();
