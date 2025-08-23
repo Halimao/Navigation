@@ -749,12 +749,13 @@
                             ${iconContainer.outerHTML}
                             <h3 class="text-sm font-medium text-center truncate w-full">${item.name}</h3>
                         </div>
-                        <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                            <button class="edit-item-btn w-8 h-8 rounded-full bg-dark-lighter flex items-center justify-center hover:bg-primary/20" data-id="${item.id}">
-                                <i class="fa fa-pencil text-sm"></i>
+                        <!-- 修改应用卡片的按钮区域样式 -->
+                        <div class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                            <button class="edit-item-btn w-6 h-6 rounded-full bg-dark-lighter/80 flex items-center justify-center hover:bg-primary/20" data-id="${item.id}">
+                                <i class="fa fa-pencil text-xs"></i>
                             </button>
-                            <button class="delete-item-btn w-8 h-8 rounded-full bg-dark-lighter flex items-center justify-center hover:bg-red-500/20 text-red-400" data-id="${item.id}">
-                                <i class="fa fa-trash text-sm"></i>
+                            <button class="delete-item-btn w-6 h-6 rounded-full bg-dark-lighter/80 flex items-center justify-center hover:bg-red-500/20 text-red-400" data-id="${item.id}">
+                                <i class="fa fa-trash text-xs"></i>
                             </button>
                         </div>
                     `;
