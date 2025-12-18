@@ -56,6 +56,18 @@
             .dropdown-item {
                 @apply px-4 py-2 hover:bg-dark-lighter cursor-pointer transition-colors;
             }
+            .dragging {
+                @apply opacity-50;
+            }
+            .drag-over {
+                @apply border-b-2 border-primary;
+            }
+            .group-tab-dragging {
+                @apply opacity-50 rotate-2;
+            }
+            .app-card-dragging {
+                @apply opacity-50 scale-95;
+            }
         }
     </style>
 </head>
@@ -136,6 +148,16 @@
                     class="px-3 py-1.5 rounded-md bg-primary hover:bg-primary/90 text-sm flex items-center btn-effect">
                     <i class="fa fa-plus mr-1.5"></i> 新增应用
                 </button>
+            </div>
+        </div>
+
+        <!-- 搜索框 -->
+        <div id="search-container" class="mb-6 hidden">
+            <div class="relative">
+                <i class="fa fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-text-secondary"></i>
+                <input type="text" id="search-input" 
+                    placeholder="搜索应用..."
+                    class="w-full pl-10 pr-4 py-2 bg-dark-light border border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary text-text-primary">
             </div>
         </div>
 
@@ -501,6 +523,35 @@
                 return false;
             },
 
+            // 更新分组顺序
+            updateGroupsOrder(groupIds) {
+                const data = this.getAllData();
+                const recentGroup = data.groups.find(g => g.id === 'recent');
+                const otherGroups = groupIds
+                    .map(id => data.groups.find(g => g.id === id))
+                    .filter(g => g && g.id !== 'recent');
+                
+                // 重新组织分组：最近访问始终在第一位
+                data.groups = recentGroup ? [recentGroup, ...otherGroups] : otherGroups;
+                this.saveData(data);
+            },
+
+            // 更新应用顺序
+            updateItemsOrder(groupId, itemIds) {
+                const data = this.getAllData();
+                const group = data.groups.find(g => g.id === groupId);
+                
+                if (group) {
+                    // 按新顺序重新排列items
+                    const itemMap = new Map(group.items.map(item => [item.id, item]));
+                    group.items = itemIds
+                        .map(id => itemMap.get(id))
+                        .filter(item => item !== undefined);
+                    
+                    this.saveData(data);
+                }
+            },
+
             // 清空最近访问记录
             clearRecentItems() {
                 const data = this.getAllData();
@@ -597,6 +648,48 @@
                         }`;
                     tab.textContent = group.name;
                     tab.dataset.groupId = group.id;
+                    tab.draggable = !group.isDefault; // 默认分组不能拖动
+
+                    // 拖动事件处理
+                    tab.addEventListener('dragstart', (e) => {
+                        if (!group.isDefault) {
+                            e.dataTransfer.effectAllowed = 'move';
+                            e.target.classList.add('group-tab-dragging');
+                            e.dataTransfer.setData('text/plain', group.id);
+                        }
+                    });
+
+                    tab.addEventListener('dragend', (e) => {
+                        e.target.classList.remove('group-tab-dragging');
+                    });
+
+                    tab.addEventListener('dragover', (e) => {
+                        if (!group.isDefault) {
+                            e.preventDefault();
+                            e.dataTransfer.dropEffect = 'move';
+                        }
+                    });
+
+                    tab.addEventListener('drop', (e) => {
+                        e.preventDefault();
+                        if (!group.isDefault) {
+                            const draggedGroupId = e.dataTransfer.getData('text/plain');
+                            if (draggedGroupId && draggedGroupId !== group.id) {
+                                // 获取当前分组顺序
+                                const groupIds = Array.from(groupTabsContainer.querySelectorAll('[data-group-id]'))
+                                    .map(tab => tab.dataset.groupId)
+                                    .filter(id => id !== draggedGroupId);
+                                
+                                // 找到目标位置并插入
+                                const targetIndex = groupIds.indexOf(group.id);
+                                groupIds.splice(targetIndex, 0, draggedGroupId);
+                                
+                                // 更新顺序
+                                DataManager.updateGroupsOrder(groupIds);
+                                this.renderGroupTabs();
+                            }
+                        }
+                    });
 
                     tab.addEventListener('click', () => {
                         DataManager.setCurrentGroupId(group.id);
@@ -616,6 +709,16 @@
                 // 更新标题和描述
                 document.getElementById('current-group-title').textContent = currentGroup.name;
                 document.getElementById('current-group-desc').textContent = currentGroup.desc || '无描述';
+
+                // 显示搜索框（如果有应用）
+                const searchContainer = document.getElementById('search-container');
+                if (currentGroup.items.length > 0) {
+                    searchContainer.classList.remove('hidden');
+                    // 清空搜索输入
+                    document.getElementById('search-input').value = '';
+                } else {
+                    searchContainer.classList.add('hidden');
+                }
 
                 // 获取按钮容器并清空
                 const actionsContainer = document.getElementById('current-group-actions');
@@ -700,12 +803,23 @@
             },
 
             // 渲染应用列表
-            renderApps(items) {
+            renderApps(items, filteredItems = null) {
                 const appsGrid = document.getElementById('apps-grid');
                 const currentGroup = DataManager.getCurrentGroup();
+                
+                // 使用过滤后的应用或全部应用
+                const displayItems = filteredItems !== null ? filteredItems : items;
 
-                if (items.length == 0) {
-                    if (currentGroup.id === 'recent') {
+                if (displayItems.length == 0) {
+                    if (filteredItems !== null) {
+                        // 搜索无结果
+                        appsGrid.innerHTML = `<div class="col-span-full flex items-center justify-center py-16 text-text-secondary">
+                            <div class="text-center">
+                                <i class="fa fa-search text-4xl mb-3 opacity-30"></i>
+                                <p>未找到匹配的应用</p>
+                            </div>
+                        </div>`;
+                    } else if (currentGroup.id === 'recent') {
                         // 重置应用列表
                         appsGrid.innerHTML = `<!-- 应用卡片将通过JS动态生成 -->
                             <div class="col-span-full flex items-center justify-center py-16 text-text-secondary">
@@ -729,16 +843,17 @@
                     appsGrid.innerHTML = ""
                 }
 
-
-                // 对最近访问分组按访问时间排序
-                let sortedItems = [...items];
-                if (currentGroup.id === 'recent') {
+                // 对最近访问分组按访问时间排序（如果没有搜索过滤）
+                let sortedItems = [...displayItems];
+                if (currentGroup.id === 'recent' && filteredItems === null) {
                     sortedItems.sort((a, b) => new Date(b.lastAccessed) - new Date(a.lastAccessed));
                 }
 
                 sortedItems.forEach((item, index) => {
                     const appCard = document.createElement('div');
-                    appCard.className = 'bg-dark-light rounded-lg p-3 card-hover group relative overflow-hidden';
+                    appCard.className = 'bg-dark-light rounded-lg p-3 card-hover group relative overflow-hidden cursor-move';
+                    appCard.draggable = true;
+                    appCard.dataset.itemId = item.id;
 
                     // 创建图标容器
                     const iconContainer = this.createAppIcon(item, index);
@@ -759,6 +874,42 @@
                             </button>
                         </div>
                     `;
+
+                    // 拖动事件处理
+                    appCard.addEventListener('dragstart', (e) => {
+                        e.dataTransfer.effectAllowed = 'move';
+                        appCard.classList.add('app-card-dragging');
+                        e.dataTransfer.setData('text/plain', item.id);
+                    });
+
+                    appCard.addEventListener('dragend', (e) => {
+                        appCard.classList.remove('app-card-dragging');
+                    });
+
+                    appCard.addEventListener('dragover', (e) => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
+                    });
+
+                    appCard.addEventListener('drop', (e) => {
+                        e.preventDefault();
+                        const draggedItemId = e.dataTransfer.getData('text/plain');
+                        if (draggedItemId && draggedItemId !== item.id) {
+                            // 获取当前应用顺序
+                            const itemIds = Array.from(appsGrid.querySelectorAll('[data-item-id]'))
+                                .map(card => card.dataset.itemId)
+                                .filter(id => id !== draggedItemId);
+                            
+                            // 找到目标位置并插入
+                            const targetIndex = itemIds.indexOf(item.id);
+                            itemIds.splice(targetIndex, 0, draggedItemId);
+                            
+                            // 更新顺序
+                            const currentGroupId = DataManager.getCurrentGroupId();
+                            DataManager.updateItemsOrder(currentGroupId, itemIds);
+                            this.renderCurrentGroup();
+                        }
+                    });
 
                     // 点击卡片打开链接并记录访问
                     appCard.addEventListener('click', (e) => {
@@ -1198,6 +1349,33 @@
 
                     this.closeItemModal();
                     this.renderCurrentGroup();
+                });
+
+                // 搜索功能
+                const searchInput = document.getElementById('search-input');
+                let searchTimeout = null;
+                
+                searchInput.addEventListener('input', (e) => {
+                    // 频率限制：防抖处理
+                    if (searchTimeout) {
+                        clearTimeout(searchTimeout);
+                    }
+
+                    searchTimeout = setTimeout(() => {
+                        const searchTerm = e.target.value.toLowerCase().trim();
+                        const currentGroup = DataManager.getCurrentGroup();
+                        
+                        if (searchTerm === '') {
+                            // 如果搜索框为空，显示全部应用
+                            this.renderApps(currentGroup.items);
+                        } else {
+                            // 过滤应用
+                            const filteredItems = currentGroup.items.filter(item =>
+                                item.name.toLowerCase().includes(searchTerm)
+                            );
+                            this.renderApps(currentGroup.items, filteredItems);
+                        }
+                    }, 300); // 延迟300ms进行过滤
                 });
             }
         };
