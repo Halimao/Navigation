@@ -157,7 +157,11 @@
                 <i class="fa fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-text-secondary"></i>
                 <input type="text" id="search-input" 
                     placeholder="搜索应用..."
-                    class="w-full pl-10 pr-4 py-2 bg-dark-light border border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary text-text-primary">
+                    class="w-full pl-10 pr-10 py-2 bg-dark-light border border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary text-text-primary">
+                <button type="button" id="clear-search-btn" 
+                    class="absolute right-3 top-1/2 transform -translate-y-1/2 text-text-secondary hover:text-text-primary hidden btn-effect">
+                    <i class="fa fa-times"></i>
+                </button>
             </div>
         </div>
 
@@ -1353,9 +1357,17 @@
 
                 // 搜索功能
                 const searchInput = document.getElementById('search-input');
+                const clearSearchBtn = document.getElementById('clear-search-btn');
                 let searchTimeout = null;
                 
                 searchInput.addEventListener('input', (e) => {
+                    // 显示/隐藏清空按钮
+                    if (e.target.value.trim() === '') {
+                        clearSearchBtn.classList.add('hidden');
+                    } else {
+                        clearSearchBtn.classList.remove('hidden');
+                    }
+                    
                     // 频率限制：防抖处理
                     if (searchTimeout) {
                         clearTimeout(searchTimeout);
@@ -1376,6 +1388,17 @@
                             this.renderApps(currentGroup.items, filteredItems);
                         }
                     }, 300); // 延迟300ms进行过滤
+                });
+
+                // 清空搜索框
+                clearSearchBtn.addEventListener('click', () => {
+                    searchInput.value = '';
+                    searchInput.focus();
+                    clearSearchBtn.classList.add('hidden');
+                    
+                    // 重新渲染全部应用
+                    const currentGroup = DataManager.getCurrentGroup();
+                    this.renderApps(currentGroup.items);
                 });
             }
         };
